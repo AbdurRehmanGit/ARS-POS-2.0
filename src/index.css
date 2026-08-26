@@ -1,0 +1,5 @@
+/* Main CSS entry — imports all design system modules in correct cascade order */
+@import './styles/index.css';
+@import './styles/auth.css';
+@import './styles/layout.css';
+@import './styles/pos.css';
