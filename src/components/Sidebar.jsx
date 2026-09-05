@@ -11,13 +11,18 @@ import {
   LogOut, 
   Utensils, 
   User,
-  Shield
+  Shield,
+  Truck,
+  Bike,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'pos', label: 'Point of Sale', icon: ShoppingBag },
+  { key: 'pending_deliveries', label: 'Pending Deliveries', icon: Truck },
+  { key: 'rider_management', label: 'Riders', icon: Bike },
   { key: 'menu_management', label: 'Menu Management', icon: UtensilsCrossed },
   { key: 'inventory', label: 'Inventory', icon: Boxes },
   { key: 'order_history', label: 'Order History', icon: Receipt },
@@ -90,6 +95,20 @@ export default function Sidebar({ activePage, onNavigate, isMobileOpen, onCloseM
             );
           })}
         </nav>
+
+        {/* Rider Mobile Portal Quick Launcher */}
+        <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #f1f5f9' }}>
+          <button
+            type="button"
+            onClick={() => handleNavClick('rider_portal')}
+            className={`btn btn-secondary ${activePage === 'rider_portal' ? 'active' : ''}`}
+            style={{ width: '100%', fontSize: '0.8rem', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.75rem', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
+            title="Open Rider Mobile GPS Dispatch Portal"
+          >
+            <Smartphone size={15} color="var(--primary-orange)" />
+            <span>Rider Mobile GPS</span>
+          </button>
+        </div>
 
         {/* Footer User Profile Card */}
         <div className="sidebar-footer">

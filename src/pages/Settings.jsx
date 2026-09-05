@@ -3,7 +3,7 @@ import {
   Settings as SettingsIcon, Save, Upload, Building2, Percent,
   ChefHat, Shield, KeyRound, Mail, Check, X, AlertCircle,
   RefreshCw, User, Users, ToggleLeft, ToggleRight, Eye, EyeOff,
-  Coins
+  Coins, MapPin, Navigation
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -15,6 +15,8 @@ const PAGE_KEYS = [
   { key: 'menu_management', label: 'Menu Mgmt' },
   { key: 'inventory', label: 'Inventory' },
   { key: 'order_history', label: 'Orders' },
+  { key: 'pending_deliveries', label: 'Pending Deliveries' },
+  { key: 'rider_management', label: 'Riders' },
   { key: 'reports', label: 'Reports' },
   { key: 'staff_management', label: 'Staff Mgmt' },
   { key: 'settings', label: 'Settings' },
@@ -591,6 +593,49 @@ export default function Settings() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================
+          SECTION 4: LIVE MAPS & GPS TELEMETRY STATUS
+          ============================================================ */}
+      <section className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+          <Navigation size={20} color="var(--primary-orange)" />
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Rider Live Tracking &amp; Maps</h2>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Monitor GPS telemetry and Google Maps integration status.</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div>
+                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Google Maps JavaScript API</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  Interactive live map visualization for dispatchers
+                </div>
+              </div>
+              {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+                <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Check size={13} />
+                  <span>Configured</span>
+                </span>
+              ) : (
+                <span className="badge badge-pending" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <MapPin size={13} />
+                  <span>Not Configured</span>
+                </span>
+              )}
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
+              {import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+                ? 'Google Maps API is active. Real-time satellite & street maps with animated rider pins are enabled.'
+                : 'No Google Maps key found. Live GPS telemetry mode is active: coordinates, speeds, and timestamps update in real-time. Add VITE_GOOGLE_MAPS_API_KEY to your environment whenever you want visual map rendering.'}
+            </p>
           </div>
         </div>
       </section>

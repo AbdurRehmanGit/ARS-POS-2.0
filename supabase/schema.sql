@@ -322,3 +322,73 @@ CREATE POLICY "Tenant isolation for staff" ON public.staff
 -- ====================================================================
 ALTER TABLE public.organizations
   ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'PKR';
+
+-- ====================================================================
+-- RIDER TRACKING & DELIVERY DISPATCH SYSTEM SCHEMA (SPRINTS A - E)
+-- ====================================================================
+
+-- 1. Riders Table
+CREATE TABLE IF NOT EXISTS public.riders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  salary NUMERIC,
+  phone TEXT NOT NULL,
+  email TEXT,
+  bike_model TEXT,
+  bike_number TEXT,
+  login_pin TEXT,
+  status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'busy', 'absent')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_riders_org ON public.riders(organization_id);
+CREATE INDEX IF NOT EXISTS idx_riders_status ON public.riders(organization_id, status);
+
+ALTER TABLE public.riders ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Tenant isolation for riders" ON public.riders
+  FOR ALL TO authenticated
+  USING (organization_id = public.get_user_organization_id())
+  WITH CHECK (organization_id = public.get_user_organization_id());
+
+-- 2. Extend Orders Table for Delivery Support
+ALTER TABLE public.orders 
+  ADD COLUMN IF NOT EXISTS order_type TEXT NOT NULL DEFAULT 'walkin' CHECK (order_type IN ('walkin', 'delivery')),
+  ADD COLUMN IF NOT EXISTS delivery_status TEXT DEFAULT NULL CHECK (delivery_status IN ('pending', 'assigned', 'out_for_delivery', 'delivered', 'cancelled')),
+  ADD COLUMN IF NOT EXISTS customer_phone TEXT,
+  ADD COLUMN IF NOT EXISTS delivery_address TEXT,
+  ADD COLUMN IF NOT EXISTS rider_id UUID REFERENCES public.riders(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_orders_delivery ON public.orders(organization_id, order_type, delivery_status);
+
+-- 3. Live Rider Locations Table (GPS Telemetry)
+CREATE TABLE IF NOT EXISTS public.rider_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rider_id UUID NOT NULL REFERENCES public.riders(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  latitude NUMERIC NOT NULL,
+  longitude NUMERIC NOT NULL,
+  heading NUMERIC,
+  speed NUMERIC,
+  is_sharing BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rider_locations_rider ON public.rider_locations(rider_id);
+CREATE INDEX IF NOT EXISTS idx_rider_locations_org ON public.rider_locations(organization_id, updated_at DESC);
+
+ALTER TABLE public.rider_locations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Tenant isolation for rider_locations" ON public.rider_locations
+  FOR ALL TO authenticated
+  USING (organization_id = public.get_user_organization_id())
+  WITH CHECK (organization_id = public.get_user_organization_id());
+
+-- Allow public access for rider mobile portal location reporting (keyed by rider_id)
+CREATE POLICY "Rider portal location update" ON public.rider_locations
+  FOR ALL TO anon
+  USING (true)
+  WITH CHECK (true);

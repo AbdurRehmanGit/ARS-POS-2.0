@@ -16,12 +16,15 @@ import OrderHistory from './pages/OrderHistory';
 import Reports from './pages/Reports';
 import StaffManagement from './pages/StaffManagement';
 import Settings from './pages/Settings';
+import PendingDeliveries from './pages/PendingDeliveries';
+import RiderManagement from './pages/RiderManagement';
+import RiderPortal from './pages/RiderPortal';
 
 import { ShieldAlert, LogOut } from 'lucide-react';
 
 export default function App() {
   const { user, profile, organization, loading, isPageAllowed, signOut } = useAuth();
-  const [authView, setAuthView] = useState('signup'); // 'signup' | 'login'
+  const [authView, setAuthView] = useState('signup'); // 'signup' | 'login' | 'rider_portal'
   const [activePage, setActivePage] = useState('dashboard');
   const [unauthorizedMessage, setUnauthorizedMessage] = useState(null);
 
@@ -35,6 +38,12 @@ export default function App() {
 
   // Route Guard Navigator
   const handleNavigate = (pageKey) => {
+    if (pageKey === 'rider_portal') {
+      setActivePage(pageKey);
+      setUnauthorizedMessage(null);
+      return;
+    }
+
     const isAllowed = isPageAllowed(pageKey);
     const item = NAV_ITEMS.find((n) => n.key === pageKey);
     const pageTitle = item ? item.label : pageKey;
@@ -54,7 +63,7 @@ export default function App() {
 
   // When role changes (e.g. via testing switcher), verify current page is still allowed
   useEffect(() => {
-    if (activePage !== 'dashboard' && !isPageAllowed(activePage)) {
+    if (activePage !== 'dashboard' && activePage !== 'rider_portal' && !isPageAllowed(activePage)) {
       setActivePage('dashboard');
       const item = NAV_ITEMS.find((n) => n.key === activePage);
       const pageTitle = item ? item.label : activePage;
@@ -72,10 +81,18 @@ export default function App() {
 
   // 2. Unauthenticated State
   if (!user) {
+    if (authView === 'rider_portal') {
+      return <RiderPortal onBackToDashboard={() => setAuthView('login')} />;
+    }
     return authView === 'signup' ? (
-      <SignUp onNavigateToLogin={() => setAuthView('login')} />
+      <SignUp 
+        onNavigateToLogin={() => setAuthView('login')} 
+      />
     ) : (
-      <Login onNavigateToSignUp={() => setAuthView('signup')} />
+      <Login 
+        onNavigateToSignUp={() => setAuthView('signup')} 
+        onNavigateToRiderPortal={() => setAuthView('rider_portal')}
+      />
     );
   }
 
@@ -87,12 +104,21 @@ export default function App() {
   }
 
   if (orgStatus === 10) {
+    // If viewing standalone Rider Portal from inside app layout
+    if (activePage === 'rider_portal') {
+      return <RiderPortal onBackToDashboard={() => setActivePage('dashboard')} />;
+    }
+
     const renderPageContent = () => {
       switch (activePage) {
         case 'dashboard':
           return <Dashboard onNavigateToPage={handleNavigate} />;
         case 'pos':
           return <Pos />;
+        case 'pending_deliveries':
+          return <PendingDeliveries onNavigateToRiders={() => handleNavigate('rider_management')} />;
+        case 'rider_management':
+          return <RiderManagement onNavigateToDeliveries={() => handleNavigate('pending_deliveries')} />;
         case 'menu_management':
           return <MenuManagement />;
         case 'inventory':

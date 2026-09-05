@@ -17,7 +17,11 @@ import {
   Minus,
   AlertCircle,
   ShoppingBag,
-  Utensils
+  Utensils,
+  Truck,
+  User,
+  MapPin,
+  Phone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -36,6 +40,7 @@ export default function OrderHistory() {
   // Filters
   const [dateFilter, setDateFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('all'); // 'all' | 'walkin' | 'delivery'
   const [searchTerm, setSearchTerm] = useState('');
 
   // Order View/Edit Modal
@@ -75,8 +80,10 @@ export default function OrderHistory() {
             .from('orders')
             .select(`
               id, organization_id, receipt_number, staff_id, customer_name,
+              customer_phone, delivery_address, order_type, delivery_status, rider_id,
               subtotal, tax, total, payment_method, status, created_at,
               profiles ( full_name ),
+              riders ( name, phone ),
               order_items (
                 id, menu_item_id, item_name, size_label,
                 quantity, unit_price, line_total
@@ -141,12 +148,17 @@ export default function OrderHistory() {
 
     if (paymentFilter !== 'all' && order.payment_method !== paymentFilter) return false;
 
+    if (orderTypeFilter === 'walkin' && order.order_type === 'delivery') return false;
+    if (orderTypeFilter === 'delivery' && order.order_type !== 'delivery') return false;
+
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const matchReceipt = order.receipt_number?.toString().includes(term);
       const matchCust = order.customer_name?.toLowerCase().includes(term);
+      const matchPhone = order.customer_phone?.toLowerCase().includes(term);
+      const matchAddress = order.delivery_address?.toLowerCase().includes(term);
       const matchStaff = order.profiles?.full_name?.toLowerCase().includes(term);
-      if (!matchReceipt && !matchCust && !matchStaff) return false;
+      if (!matchReceipt && !matchCust && !matchPhone && !matchAddress && !matchStaff) return false;
     }
 
     return true;
@@ -348,17 +360,21 @@ export default function OrderHistory() {
   // Export CSV
   const handleExportCSV = () => {
     if (filteredOrders.length === 0) { alert('No orders to export.'); return; }
-    const headers = ['Receipt #','Date Time','Customer','Staff','Payment','Subtotal','Tax','Total','Status'];
+    const headers = ['Receipt #','Date Time','Type','Customer','Phone','Address','Staff','Payment','Subtotal','Tax','Total','Status','Delivery Status'];
     const rows = filteredOrders.map((o) => [
       o.receipt_number,
       `"${new Date(o.created_at).toLocaleString()}"`,
+      o.order_type === 'delivery' ? 'Delivery' : 'Walk-in',
       `"${o.customer_name || 'Walk-in'}"`,
+      `"${o.customer_phone || ''}"`,
+      `"${o.delivery_address || ''}"`,
       `"${o.profiles?.full_name || 'Staff'}"`,
       o.payment_method,
       parseFloat(o.subtotal).toFixed(2),
       parseFloat(o.tax).toFixed(2),
       parseFloat(o.total).toFixed(2),
       o.status,
+      o.delivery_status || ''
     ]);
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -392,18 +408,24 @@ export default function OrderHistory() {
       receiptOrder.organization_phone ? `  Tel: ${receiptOrder.organization_phone}` : '',
       `================================`,
       `Receipt #: ${receiptOrder.receipt_number}`,
-      `Date: ${new Date(receiptOrder.created_at).toLocaleString()}`,
-      `Customer: ${receiptOrder.customer_name}`,
-      `Cashier: ${receiptOrder.cashier_name}`,
+      `Type:      ${receiptOrder.order_type === 'delivery' ? 'DELIVERY ORDER' : 'WALK-IN ORDER'}`,
+      `Date:      ${new Date(receiptOrder.created_at).toLocaleString()}`,
+      `Customer:  ${receiptOrder.customer_name}`,
+      receiptOrder.customer_phone ? `Phone:     ${receiptOrder.customer_phone}` : '',
+      receiptOrder.delivery_address ? `Address:   ${receiptOrder.delivery_address}` : '',
+      `Cashier:   ${receiptOrder.cashier_name}`,
       `--------------------------------`,
       ...receiptOrder.items.map((i) => `${i.quantity}x ${i.item_name} (${i.size_label || 'Regular'}) - ${currency} ${parseFloat(i.line_total).toFixed(2)}`),
       `--------------------------------`,
-      `Subtotal: ${currency} ${parseFloat(receiptOrder.subtotal).toFixed(2)}`,
-      `Tax:      ${currency} ${parseFloat(receiptOrder.tax).toFixed(2)}`,
-      `TOTAL:    ${currency} ${parseFloat(receiptOrder.total).toFixed(2)}`,
-      `Payment:  ${receiptOrder.payment_method}`,
+      `Subtotal:  ${currency} ${parseFloat(receiptOrder.subtotal).toFixed(2)}`,
+      `Tax:       ${currency} ${parseFloat(receiptOrder.tax).toFixed(2)}`,
+      `TOTAL:     ${currency} ${parseFloat(receiptOrder.total).toFixed(2)}`,
+      `Payment:   ${receiptOrder.payment_method}`,
       `================================`,
       `   Thank you for your visit!`,
+      `--------------------------------`,
+      `       Software by ARS`,
+      `================================`,
     ].filter(Boolean).join('\n');
     navigator.clipboard.writeText(lines);
     setCopiedReceipt(true);
@@ -420,7 +442,7 @@ export default function OrderHistory() {
             <span>Order History</span>
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            View, edit, and reprint past orders. Export CSV reports or clear history.
+            View, edit, and reprint past orders. Filter by walk-in vs delivery and export CSV reports.
           </p>
         </div>
         <div className="menu-actions-group">
@@ -450,18 +472,30 @@ export default function OrderHistory() {
       <div className="card" style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap', padding: '1rem 1.25rem' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
           <Search size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-          <input type="text" className="form-input" placeholder="Search receipt #, customer, staff..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: '2.5rem', background: '#fff' }} />
+          <input type="text" className="form-input" placeholder="Search receipt #, customer, phone, address, staff..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: '2.5rem', background: '#fff' }} />
         </div>
+
+        {/* Order Type Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <Truck size={16} color="#64748b" />
+          <select className="form-input" value={orderTypeFilter} onChange={(e) => setOrderTypeFilter(e.target.value)} style={{ width: 'auto', background: '#fff', fontWeight: 600 }}>
+            <option value="all">All Types ({orders.length})</option>
+            <option value="walkin">Walk-in Only ({orders.filter((o) => o.order_type !== 'delivery').length})</option>
+            <option value="delivery">Delivery Only ({orders.filter((o) => o.order_type === 'delivery').length})</option>
+          </select>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Calendar size={16} color="#64748b" />
           <select className="form-input" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} style={{ width: 'auto', background: '#fff', fontWeight: 600 }}>
-            <option value="all">All Dates ({orders.length})</option>
+            <option value="all">All Dates</option>
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
             <option value="7days">Last 7 Days</option>
             <option value="30days">Last 30 Days</option>
           </select>
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <CreditCard size={16} color="#64748b" />
           <select className="form-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} style={{ width: 'auto', background: '#fff', fontWeight: 600 }}>
@@ -481,15 +515,16 @@ export default function OrderHistory() {
           <div style={{ textAlign: 'center', padding: '3.5rem', color: '#64748b' }}>
             <ReceiptIcon size={42} color="#cbd5e1" style={{ margin: '0 auto 0.75rem auto' }} />
             <h3 style={{ fontSize: '1.15rem', color: '#0f172a', marginBottom: '0.35rem' }}>No Orders Found</h3>
-            <p style={{ fontSize: '0.875rem' }}>{searchTerm || dateFilter !== 'all' || paymentFilter !== 'all' ? 'No orders matched your filters.' : 'Orders from the POS terminal will appear here.'}</p>
+            <p style={{ fontSize: '0.875rem' }}>{searchTerm || dateFilter !== 'all' || paymentFilter !== 'all' || orderTypeFilter !== 'all' ? 'No orders matched your filters.' : 'Orders from the POS terminal will appear here.'}</p>
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
                 <th>Receipt #</th>
+                <th>Type</th>
                 <th>Date &amp; Time</th>
-                <th>Customer</th>
+                <th>Customer Details</th>
                 <th>Staff</th>
                 <th>Items</th>
                 <th>Payment</th>
@@ -501,16 +536,72 @@ export default function OrderHistory() {
             <tbody>
               {filteredOrders.map((order) => {
                 const itemCount = order.order_items?.reduce((s, i) => s + i.quantity, 0) || 0;
+                const isDelivery = order.order_type === 'delivery';
+
                 return (
                   <tr key={order.id}>
                     <td style={{ fontWeight: 800, color: 'var(--primary-orange)', fontFamily: 'var(--font-mono)' }}>#{order.receipt_number}</td>
+                    <td>
+                      {isDelivery ? (
+                        <span 
+                          style={{ 
+                            padding: '0.2rem 0.5rem', 
+                            background: '#fff7ed', 
+                            color: '#c2410c', 
+                            border: '1px solid #fed7aa', 
+                            borderRadius: 'var(--radius-full)', 
+                            fontSize: '0.725rem', 
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}
+                        >
+                          <Truck size={11} />
+                          <span>Delivery</span>
+                        </span>
+                      ) : (
+                        <span 
+                          style={{ 
+                            padding: '0.2rem 0.5rem', 
+                            background: '#f1f5f9', 
+                            color: '#475569', 
+                            border: '1px solid #e2e8f0', 
+                            borderRadius: 'var(--radius-full)', 
+                            fontSize: '0.725rem', 
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}
+                        >
+                          <User size={11} />
+                          <span>Walk-in</span>
+                        </span>
+                      )}
+                    </td>
                     <td style={{ fontSize: '0.825rem', color: '#475569' }}>{new Date(order.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td style={{ fontWeight: 700, color: '#0f172a' }}>{order.customer_name || 'Walk-in'}</td>
+                    <td>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{order.customer_name || 'Walk-in'}</div>
+                      {order.customer_phone && <div style={{ fontSize: '0.75rem', color: '#2563eb' }}>{order.customer_phone}</div>}
+                      {order.delivery_address && (
+                        <div style={{ fontSize: '0.725rem', color: '#64748b', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={order.delivery_address}>
+                          {order.delivery_address}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ color: '#475569', fontSize: '0.85rem' }}>{order.profiles?.full_name || 'Staff'}</td>
                     <td style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>{itemCount} {itemCount === 1 ? 'item' : 'items'}</td>
                     <td><span className="badge badge-muted">{order.payment_method}</span></td>
                     <td style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>{currency} {parseFloat(order.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    <td><span className={`badge ${order.status === 'completed' ? 'badge-active' : 'badge-danger'}`}>{order.status}</span></td>
+                    <td>
+                      <span className={`badge ${order.status === 'completed' ? 'badge-active' : 'badge-danger'}`}>{order.status}</span>
+                      {isDelivery && order.delivery_status && (
+                        <div style={{ fontSize: '0.7rem', color: '#ea580c', fontWeight: 700, textTransform: 'capitalize', marginTop: '0.15rem' }}>
+                          {order.delivery_status.replace('_', ' ')}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
                         <button type="button" onClick={() => handleOpenViewEdit(order)} className="btn btn-ghost" style={{ padding: '0.3rem 0.5rem', color: '#475569' }} title="View & Edit"><Eye size={15} /></button>
@@ -757,7 +848,10 @@ export default function OrderHistory() {
               </div>
 
               <div className="receipt-footer-msg">
-                Thank you for your visit! Please come again.
+                <div>Thank you for your visit! Please come again.</div>
+                <div style={{ marginTop: '0.45rem', fontWeight: 800, fontSize: '0.75rem', color: '#94a3b8', letterSpacing: '0.04em' }}>
+                  Software by ARS
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.65rem', marginTop: '1.25rem' }}>

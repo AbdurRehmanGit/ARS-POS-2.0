@@ -5,13 +5,15 @@ const AuthContext = createContext(null);
 
 const SANDBOX_STORAGE_KEY = 'restaurant_pos_sandbox_data';
 
-// All supported page keys for Sprint 2
+// All supported page keys for RBAC
 export const ALL_PAGE_KEYS = [
   'dashboard',
   'pos',
   'menu_management',
   'inventory',
   'order_history',
+  'pending_deliveries',
+  'rider_management',
   'reports',
   'staff_management',
   'settings'

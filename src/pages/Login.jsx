@@ -3,7 +3,7 @@ import { Utensils, Mail, Lock, Eye, EyeOff, AlertCircle, LogIn, ArrowRight } fro
 import { useAuth } from '../context/AuthContext';
 import ConfigAlert from '../components/ConfigAlert';
 
-export default function Login({ onNavigateToSignUp }) {
+export default function Login({ onNavigateToSignUp, onNavigateToRiderPortal }) {
   const { signIn, error: authError } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -139,18 +139,33 @@ export default function Login({ onNavigateToSignUp }) {
           </button>
         </form>
 
-        <div className="auth-footer">
-          <span>Don't have an account yet? </span>
-          <a
-            href="#signup"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigateToSignUp();
-            }}
-            style={{ fontWeight: 600 }}
-          >
-            Register your restaurant
-          </a>
+        <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', alignItems: 'center' }}>
+          <div>
+            <span>Don't have an account yet? </span>
+            <a
+              href="#signup"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigateToSignUp();
+              }}
+              style={{ fontWeight: 600 }}
+            >
+              Register your restaurant
+            </a>
+          </div>
+
+          {onNavigateToRiderPortal && (
+            <div style={{ paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', width: '100%', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={onNavigateToRiderPortal}
+                className="btn btn-ghost"
+                style={{ fontSize: '0.8rem', color: 'var(--primary-orange)', fontWeight: 700 }}
+              >
+                🏍️ Delivery Rider? Access Mobile GPS Portal
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

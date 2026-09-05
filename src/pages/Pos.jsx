@@ -16,7 +16,10 @@ import {
   Receipt as ReceiptIcon,
   AlertCircle,
   Pizza,
-  User
+  User,
+  Truck,
+  MapPin,
+  Phone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -38,6 +41,9 @@ export default function Pos() {
   // Cart / Current Order State
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState('Walk-in Customer');
+  const [orderType, setOrderType] = useState('walkin'); // 'walkin' | 'delivery'
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
 
   // Modals State
   const [sizePickerItem, setSizePickerItem] = useState(null);
@@ -223,7 +229,11 @@ export default function Pos() {
             organization_id: organization.id,
             receipt_number: receiptNumber,
             staff_id: profile?.id || null,
-            customer_name: customerName.trim() || 'Walk-in Customer',
+            customer_name: customerName.trim() || (orderType === 'delivery' ? 'Delivery Customer' : 'Walk-in Customer'),
+            order_type: orderType,
+            delivery_status: orderType === 'delivery' ? 'pending' : null,
+            customer_phone: orderType === 'delivery' ? customerPhone.trim() : null,
+            delivery_address: orderType === 'delivery' ? deliveryAddress.trim() : null,
             subtotal: subtotal,
             tax: tax,
             total: total,
@@ -261,7 +271,11 @@ export default function Pos() {
           id: 'ord_' + Math.random().toString(36).substring(2, 9),
           organization_id: organization.id,
           receipt_number: receiptNumber,
-          customer_name: customerName.trim() || 'Walk-in Customer',
+          customer_name: customerName.trim() || (orderType === 'delivery' ? 'Delivery Customer' : 'Walk-in Customer'),
+          order_type: orderType,
+          delivery_status: orderType === 'delivery' ? 'pending' : null,
+          customer_phone: orderType === 'delivery' ? customerPhone.trim() : null,
+          delivery_address: orderType === 'delivery' ? deliveryAddress.trim() : null,
           subtotal,
           tax,
           total,
@@ -300,6 +314,9 @@ export default function Pos() {
       // Reset cart and checkout modal
       setCart([]);
       setCustomerName('Walk-in Customer');
+      setOrderType('walkin');
+      setCustomerPhone('');
+      setDeliveryAddress('');
       setCheckoutModalOpen(false);
     } catch (err) {
       console.error('Error completing order:', err);
@@ -319,20 +336,26 @@ export default function Pos() {
       completedOrder.organization_phone ? `  Tel: ${completedOrder.organization_phone}` : '',
       `================================`,
       `Receipt #: ${completedOrder.receipt_number}`,
-      `Date: ${new Date(completedOrder.created_at).toLocaleString()}`,
-      `Customer: ${completedOrder.customer_name}`,
-      `Cashier: ${completedOrder.cashier_name}`,
+      `Type:      ${completedOrder.order_type === 'delivery' ? 'DELIVERY ORDER' : 'WALK-IN ORDER'}`,
+      `Date:      ${new Date(completedOrder.created_at).toLocaleString()}`,
+      `Customer:  ${completedOrder.customer_name}`,
+      completedOrder.customer_phone ? `Phone:     ${completedOrder.customer_phone}` : '',
+      completedOrder.delivery_address ? `Address:   ${completedOrder.delivery_address}` : '',
+      `Cashier:   ${completedOrder.cashier_name}`,
       `--------------------------------`,
       ...completedOrder.items.map(
         (i) => `${i.quantity}x ${i.item_name} (${i.size_label}) - ${currency} ${i.line_total.toFixed(2)}`
       ),
       `--------------------------------`,
-      `Subtotal: ${currency} ${completedOrder.subtotal.toFixed(2)}`,
-      `Tax:      ${currency} ${completedOrder.tax.toFixed(2)}`,
-      `TOTAL:    ${currency} ${completedOrder.total.toFixed(2)}`,
-      `Payment:  ${completedOrder.payment_method}`,
+      `Subtotal:  ${currency} ${completedOrder.subtotal.toFixed(2)}`,
+      `Tax:       ${currency} ${completedOrder.tax.toFixed(2)}`,
+      `TOTAL:     ${currency} ${completedOrder.total.toFixed(2)}`,
+      `Payment:   ${completedOrder.payment_method}`,
       `================================`,
       `   Thank you for your visit!`,
+      `--------------------------------`,
+      `       Software by ARS`,
+      `================================`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -655,7 +678,7 @@ export default function Pos() {
           ==================================================================== */}
       {checkoutModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-box" style={{ maxWidth: '480px' }}>
+          <div className="modal-box" style={{ maxWidth: '500px' }}>
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <CircleDollarSign size={22} color="var(--primary-orange)" />
@@ -670,19 +693,131 @@ export default function Pos() {
               </button>
             </div>
 
-            <div style={{ textAlign: 'center', margin: '0.5rem 0 1.25rem 0' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-gray-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Amount Due
+            {/* Total Amount Due Banner */}
+            <div style={{ textAlign: 'center', margin: '0.5rem 0 1.25rem 0', background: '#fff7ed', padding: '1rem', borderRadius: 'var(--radius-lg)', border: '1px solid #ffedd5' }}>
+              <div style={{ fontSize: '0.8rem', color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
+                Total Amount Due
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary-orange)', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--primary-orange)', marginTop: '0.15rem' }}>
                 {currency} {total.toFixed(2)}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-dark-bold)', marginTop: '0.25rem' }}>
-                Customer: <strong>{customerName}</strong>
               </div>
             </div>
 
-            <label className="form-label" style={{ color: 'var(--text-dark-bold)' }}>
+            {/* Step 1: Order Type Selector */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ color: 'var(--text-dark-bold)', fontWeight: 800 }}>
+                Order Type:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('walkin')}
+                  className="btn"
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: `2px solid ${orderType === 'walkin' ? 'var(--primary-orange)' : '#e2e8f0'}`,
+                    background: orderType === 'walkin' ? '#fff7ed' : '#f8fafc',
+                    color: orderType === 'walkin' ? '#c2410c' : '#475569',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <User size={18} />
+                  <span>Walk-in Customer</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOrderType('delivery')}
+                  className="btn"
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: `2px solid ${orderType === 'delivery' ? 'var(--primary-orange)' : '#e2e8f0'}`,
+                    background: orderType === 'delivery' ? '#fff7ed' : '#f8fafc',
+                    color: orderType === 'delivery' ? '#c2410c' : '#475569',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Truck size={18} />
+                  <span>Delivery Order</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Delivery Customer Details Form */}
+            {orderType === 'delivery' ? (
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <MapPin size={14} color="var(--primary-orange)" />
+                  <span>Delivery Information (Required)</span>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Customer Name <span className="required-mark">*</span></label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Usman Ali"
+                    value={customerName === 'Walk-in Customer' ? '' : customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    style={{ background: '#fff' }}
+                    required
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Customer Phone Number <span className="required-mark">*</span></label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="03xx-xxxxxxx"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    style={{ background: '#fff' }}
+                    required
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Delivery Address <span className="required-mark">*</span></label>
+                  <textarea
+                    rows={2}
+                    className="form-input"
+                    placeholder="House #, Street, Block, Area, Landmarks..."
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    style={{ background: '#fff', resize: 'vertical' }}
+                    required
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label" style={{ color: 'var(--text-dark-bold)' }}>
+                  Customer Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Walk-in Customer"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  style={{ background: '#f8fafc' }}
+                />
+              </div>
+            )}
+
+            {/* Step 2: Payment Method */}
+            <label className="form-label" style={{ color: 'var(--text-dark-bold)', fontWeight: 800 }}>
               Select Payment Method:
             </label>
 
@@ -750,7 +885,7 @@ export default function Pos() {
               </button>
               <button
                 type="button"
-                disabled={completingOrder}
+                disabled={completingOrder || (orderType === 'delivery' && (!customerPhone.trim() || !deliveryAddress.trim()))}
                 onClick={handleConfirmOrder}
                 className="btn btn-primary"
                 style={{ flex: 1, background: 'var(--primary-orange)', color: '#fff', border: 'none', fontWeight: 800 }}
@@ -802,15 +937,29 @@ export default function Pos() {
                 </div>
               </div>
 
-              {/* Customer & Cashier Info Grid */}
+              {/* Order Type & Customer/Cashier Info Grid */}
               <div className="receipt-info-grid">
                 <div>
-                  <div className="receipt-info-label">Customer</div>
-                  <div className="receipt-info-val">{completedOrder.customer_name || 'Walk-in'}</div>
+                  <div className="receipt-info-label">Order Type</div>
+                  <div className="receipt-info-val" style={{ color: completedOrder.order_type === 'delivery' ? '#ea580c' : '#0f172a' }}>
+                    {completedOrder.order_type === 'delivery' ? '🛵 DELIVERY' : '🚶 WALK-IN'}
+                  </div>
                 </div>
                 <div>
                   <div className="receipt-info-label">Cashier</div>
                   <div className="receipt-info-val">{completedOrder.cashier_name || 'Staff'}</div>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div className="receipt-info-label">Customer</div>
+                  <div className="receipt-info-val">
+                    {completedOrder.customer_name || 'Customer'}
+                    {completedOrder.customer_phone && ` (${completedOrder.customer_phone})`}
+                  </div>
+                  {completedOrder.delivery_address && (
+                    <div style={{ fontSize: '0.775rem', color: '#475569', marginTop: '0.2rem', lineHeight: 1.4 }}>
+                      <strong>Address:</strong> {completedOrder.delivery_address}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -859,7 +1008,10 @@ export default function Pos() {
               </div>
 
               <div className="receipt-footer-msg">
-                Thank you for your visit! Please come again.
+                <div>Thank you for your visit! Please come again.</div>
+                <div style={{ marginTop: '0.45rem', fontWeight: 800, fontSize: '0.75rem', color: '#94a3b8', letterSpacing: '0.04em' }}>
+                  Software by ARS
+                </div>
               </div>
             </div>
 
