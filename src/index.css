@@ -3,3 +3,16 @@
 @import './styles/auth.css';
 @import './styles/layout.css';
 @import './styles/pos.css';
+
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-list > * {
+  animation: fadeIn 300ms ease-out;
+}

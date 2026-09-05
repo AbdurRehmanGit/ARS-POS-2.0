@@ -331,8 +331,36 @@ ALTER TABLE public.role_permissions ADD CONSTRAINT role_permissions_page_key_che
   CHECK (page_key IN (
     'dashboard', 'pos', 'pending_deliveries', 'rider_management',
     'menu_management', 'inventory', 'order_history', 'reports', 
-    'staff_management', 'settings'
+    'staff_management', 'expenses', 'profit_and_loss', 'settings'
   ));
+
+-- ====================================================================
+-- SPRINT F & G: EXPENSES & PROFIT/LOSS SYSTEM SCHEMA
+-- ====================================================================
+
+-- Expenses Table
+CREATE TABLE IF NOT EXISTS public.expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Other',
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_org ON public.expenses(organization_id, expense_date DESC);
+CREATE INDEX IF NOT EXISTS idx_expenses_cat ON public.expenses(organization_id, category);
+
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Tenant isolation for expenses" ON public.expenses;
+CREATE POLICY "Tenant isolation for expenses" ON public.expenses
+  FOR ALL TO authenticated
+  USING (organization_id = public.get_user_organization_id())
+  WITH CHECK (organization_id = public.get_user_organization_id());
 
 -- ====================================================================
 -- RIDER TRACKING & DELIVERY DISPATCH SYSTEM SCHEMA (SPRINTS A - E)

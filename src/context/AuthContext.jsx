@@ -14,6 +14,8 @@ export const ALL_PAGE_KEYS = [
   'order_history',
   'pending_deliveries',
   'rider_management',
+  'expenses',
+  'profit_and_loss',
   'reports',
   'staff_management',
   'settings'

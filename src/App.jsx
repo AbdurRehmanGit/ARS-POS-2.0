@@ -19,6 +19,8 @@ import Settings from './pages/Settings';
 import PendingDeliveries from './pages/PendingDeliveries';
 import RiderManagement from './pages/RiderManagement';
 import RiderPortal from './pages/RiderPortal';
+import ExpenseManagement from './pages/ExpenseManagement';
+import ProfitAndLoss from './pages/ProfitAndLoss';
 
 import { ShieldAlert, LogOut } from 'lucide-react';
 
@@ -131,6 +133,10 @@ export default function App() {
           return <StaffManagement />;
         case 'settings':
           return <Settings />;
+        case 'expenses':
+          return <ExpenseManagement />;
+        case 'profit_and_loss':
+          return <ProfitAndLoss />;
         default:
           return <Dashboard onNavigateToPage={handleNavigate} />;
       }

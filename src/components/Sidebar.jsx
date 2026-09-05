@@ -14,7 +14,9 @@ import {
   Shield,
   Truck,
   Bike,
-  Smartphone
+  Smartphone,
+  Wallet,
+  TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,6 +25,8 @@ export const NAV_ITEMS = [
   { key: 'pos', label: 'Point of Sale', icon: ShoppingBag },
   { key: 'pending_deliveries', label: 'Pending Deliveries', icon: Truck },
   { key: 'rider_management', label: 'Riders', icon: Bike },
+  { key: 'expenses', label: 'Expenses', icon: Wallet },
+  { key: 'profit_and_loss', label: 'Profit & Loss', icon: TrendingUp },
   { key: 'menu_management', label: 'Menu Management', icon: UtensilsCrossed },
   { key: 'inventory', label: 'Inventory', icon: Boxes },
   { key: 'order_history', label: 'Order History', icon: Receipt },
