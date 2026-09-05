@@ -252,8 +252,10 @@
   display: flex;
   gap: 0.5rem;
   overflow-x: auto;
-  padding-bottom: 0.35rem;
+  padding-bottom: 0.45rem;
   scrollbar-width: thin;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pos-tab-btn {
@@ -268,11 +270,17 @@
   white-space: nowrap;
   transition: all var(--transition-fast);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  user-select: none;
 }
 
 .pos-tab-btn:hover {
   color: #0f172a;
   border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.pos-tab-btn:active {
+  transform: scale(0.96);
 }
 
 .pos-tab-btn.active {
@@ -282,11 +290,23 @@
   box-shadow: 0 2px 8px var(--primary-orange-glow);
 }
 
-/* POS Item Cards Grid */
+/* POS Item Cards Grid with Smooth Stagger Animation */
+@keyframes posCardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .pos-items-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
+  scroll-behavior: smooth;
 }
 
 .pos-item-card {
@@ -300,15 +320,22 @@
   min-height: 125px;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s ease;
   text-align: left;
   position: relative;
+  user-select: none;
+  animation: posCardEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .pos-item-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--primary-orange);
-  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.18);
+}
+
+.pos-item-card:active {
+  transform: scale(0.97) translateY(0);
+  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.2);
 }
 
 .pos-card-name {
@@ -403,6 +430,17 @@
   border-color: var(--primary-orange);
 }
 
+@keyframes cartItemSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .pos-cart-items {
   flex: 1;
   overflow-y: auto;
@@ -410,6 +448,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
 }
 
 .pos-cart-item {
@@ -419,6 +459,7 @@
   padding: 0.65rem 0;
   border-bottom: 1px solid #f1f5f9;
   gap: 0.5rem;
+  animation: cartItemSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .pos-cart-item-info {

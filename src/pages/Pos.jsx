@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   ShoppingBag, 
   Search, 
@@ -189,11 +189,11 @@ export default function Pos() {
     setCustomerName('Walk-in Customer');
   };
 
-  // Calculations
+  // Calculations (Memoized for high performance)
   const taxPercent = organization?.tax_percent ? parseFloat(organization.tax_percent) : 0;
-  const subtotal = cart.reduce((sum, item) => sum + item.line_total, 0);
-  const tax = subtotal * (taxPercent / 100);
-  const total = subtotal + tax;
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.line_total, 0), [cart]);
+  const tax = useMemo(() => subtotal * (taxPercent / 100), [subtotal, taxPercent]);
+  const total = useMemo(() => subtotal + tax, [subtotal, tax]);
 
   // Checkout / Complete Order
   const handleConfirmOrder = async () => {
@@ -365,13 +365,26 @@ export default function Pos() {
     setTimeout(() => setCopiedReceipt(false), 2000);
   };
 
-  // Filter Catalog items
-  const filteredCatalog = menuItems.filter((item) => {
-    const matchesCategory =
-      selectedCategory === 'all' || item.category_id === selectedCategory;
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Memoized Category Item Counts Map for instant lookups
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    for (let i = 0; i < menuItems.length; i++) {
+      const catId = menuItems[i].category_id;
+      if (catId) counts[catId] = (counts[catId] || 0) + 1;
+    }
+    return counts;
+  }, [menuItems]);
+
+  // Memoized Filtered Catalog items
+  const filteredCatalog = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return menuItems.filter((item) => {
+      const matchesCategory =
+        selectedCategory === 'all' || item.category_id === selectedCategory;
+      const matchesSearch = !term || item.name.toLowerCase().includes(term);
+      return matchesCategory && matchesSearch;
+    });
+  }, [menuItems, selectedCategory, searchTerm]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -413,7 +426,7 @@ export default function Pos() {
             </button>
 
             {categories.map((cat) => {
-              const count = menuItems.filter((i) => i.category_id === cat.id).length;
+              const count = categoryCounts[cat.id] || 0;
               return (
                 <button
                   key={cat.id}
