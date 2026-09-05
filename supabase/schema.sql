@@ -324,6 +324,17 @@ ALTER TABLE public.organizations
   ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'PKR';
 
 -- ====================================================================
+-- MIGRATION: UPDATE ROLE PERMISSIONS CHECK CONSTRAINT
+-- ====================================================================
+ALTER TABLE public.role_permissions DROP CONSTRAINT IF EXISTS role_permissions_page_key_check;
+ALTER TABLE public.role_permissions ADD CONSTRAINT role_permissions_page_key_check 
+  CHECK (page_key IN (
+    'dashboard', 'pos', 'pending_deliveries', 'rider_management',
+    'menu_management', 'inventory', 'order_history', 'reports', 
+    'staff_management', 'settings'
+  ));
+
+-- ====================================================================
 -- RIDER TRACKING & DELIVERY DISPATCH SYSTEM SCHEMA (SPRINTS A - E)
 -- ====================================================================
 
@@ -337,7 +348,7 @@ CREATE TABLE IF NOT EXISTS public.riders (
   email TEXT,
   bike_model TEXT,
   bike_number TEXT,
-  login_pin TEXT,
+  login_pin TEXT DEFAULT '1234',
   status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'busy', 'absent')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -348,10 +359,17 @@ CREATE INDEX IF NOT EXISTS idx_riders_status ON public.riders(organization_id, s
 
 ALTER TABLE public.riders ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant isolation for riders" ON public.riders;
 CREATE POLICY "Tenant isolation for riders" ON public.riders
   FOR ALL TO authenticated
   USING (organization_id = public.get_user_organization_id())
   WITH CHECK (organization_id = public.get_user_organization_id());
+
+-- Allow anon to verify rider phone + PIN in mobile portal
+DROP POLICY IF EXISTS "Rider portal phone login" ON public.riders;
+CREATE POLICY "Rider portal phone login" ON public.riders
+  FOR SELECT TO anon
+  USING (true);
 
 -- 2. Extend Orders Table for Delivery Support
 ALTER TABLE public.orders 
@@ -363,6 +381,12 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_orders_delivery ON public.orders(organization_id, order_type, delivery_status);
+
+-- Allow rider mobile portal to view assigned active orders
+DROP POLICY IF EXISTS "Rider portal view assigned orders" ON public.orders;
+CREATE POLICY "Rider portal view assigned orders" ON public.orders
+  FOR SELECT TO anon
+  USING (order_type = 'delivery' AND rider_id IS NOT NULL);
 
 -- 3. Live Rider Locations Table (GPS Telemetry)
 CREATE TABLE IF NOT EXISTS public.rider_locations (
@@ -382,12 +406,14 @@ CREATE INDEX IF NOT EXISTS idx_rider_locations_org ON public.rider_locations(org
 
 ALTER TABLE public.rider_locations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant isolation for rider_locations" ON public.rider_locations;
 CREATE POLICY "Tenant isolation for rider_locations" ON public.rider_locations
   FOR ALL TO authenticated
   USING (organization_id = public.get_user_organization_id())
   WITH CHECK (organization_id = public.get_user_organization_id());
 
--- Allow public access for rider mobile portal location reporting (keyed by rider_id)
+-- Allow mobile rider app to push GPS telemetry without full Supabase account session
+DROP POLICY IF EXISTS "Rider portal location update" ON public.rider_locations;
 CREATE POLICY "Rider portal location update" ON public.rider_locations
   FOR ALL TO anon
   USING (true)
